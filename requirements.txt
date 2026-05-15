@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+gradio
+requests
+beautifulsoup4
+feedparser
+python-dotenv
+
+sentence-transformers
+chromadb
+
+langchain
+langchain-community
+langchain-core
+langchain-groq
+
+tqdm
