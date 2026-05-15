@@ -5,15 +5,12 @@ from dotenv import load_dotenv
 from langchain_classic.memory import ConversationBufferMemory
 from langchain_classic.chains import ConversationChain
 from langchain_groq import ChatGroq
+from db.mongo_memory import append_message, get_conversation
 
 from rag.retriever import retrieve_documents
 
 
 load_dotenv()
-
-memory = ConversationBufferMemory(
-    return_messages=True
-)
 
 llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY"),
@@ -21,8 +18,20 @@ llm = ChatGroq(
     temperature=0
 )
 
+def build_history(messages):
 
-def ask_chatbot(query: str):
+    history = ""
+
+    for msg in messages:
+
+        history += f"""
+{msg['role']}: {msg['content']}
+"""
+
+    return history
+
+
+def ask_chatbot(query: str, session_id: str):
 
     docs = retrieve_documents(query)
 
@@ -33,10 +42,11 @@ def ask_chatbot(query: str):
         ]
     )
 
-    history = memory.load_memory_variables({})
-    conversation_history = "\n".join([f"{msg.type}: {msg.content}" for msg in history['history']])
-    print("***********************")
-    print("conversation history",conversation_history)
+    messages = get_conversation(session_id)
+
+    history = build_history(messages)
+
+
     prompt = f"""
     <system>
     You are a helpful TechCrunch AI assistant. Your job is to answer user_question using ONLY the provided context and conversation_history.
@@ -51,7 +61,7 @@ def ask_chatbot(query: str):
     </Instructions>
 
     <conversation_history>
-        {conversation_history}
+        {history}
     </conversation_history>
 
     <context>
@@ -66,13 +76,28 @@ def ask_chatbot(query: str):
 
     response = llm.invoke(prompt)
 
-    memory.save_context(
-        {"input": query},
-        {"output": response.content}
+    answer = response.content
+
+    append_message(
+        session_id=session_id,
+        role="user",
+        content=query
     )
 
+    append_message(
+        session_id=session_id,
+        role="assistant",
+        content=answer,
+        sources=[
+            {
+                "title": d["title"],
+                "url": d["source"]
+            }
+            for d in docs
+        ]
+    )
     return {
-        "answer": response.content,
+        "answer": answer,
         "sources": [
             {
                 "title": d["title"],

@@ -8,6 +8,7 @@ python-dotenv
 
 sentence-transformers
 chromadb
+pymongo
 
 langchain
 langchain-community

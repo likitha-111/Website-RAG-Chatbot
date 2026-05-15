@@ -11,6 +11,8 @@ app = FastAPI(
 
 class QueryRequest(BaseModel):
     query: str
+    session_id: str
+
 
 
 @app.get("/")
@@ -31,6 +33,6 @@ def build_db():
 @app.post("/chat")
 def chat(request: QueryRequest):
 
-    response = ask_chatbot(request.query)
+    response = ask_chatbot(request.query, request.session_id)
 
     return response

@@ -66,6 +66,9 @@ Website_chatbot/
 │
 ├── chroma_db/            # Vector database storage (auto-created)
 │   └── chroma.sqlite3
+|
+├── db/            # Mongo database storage
+│   └── mongo_memory.py    # Store conversation in database
 │
 └── data/
     ├── raw_articles.json      # Raw scraped articles
@@ -76,17 +79,18 @@ Website_chatbot/
 
 - **RSS Feed Integration**: Automatically fetches articles from TechCrunch
 - **Vector Search**: Uses embeddings for semantic similarity matching
-- **Conversational Memory**: Maintains conversation history for context-aware responses
+- **Conversation Memory**: Persists chat history in MongoDB for session-aware responses
 - **Source Attribution**: Returns cited sources with each response
-- **Dual Interface**: Web UI (Gradio) + REST API (FastAPI)
+- **Dual Interface**: Web UI (Gradio) + REST API
 - **LLM Integration**: Uses Groq's fast inference with Llama 3.1 model
-- **Persistent Storage**: Stores vectors in local ChromaDB database
+- **Persistent Storage**: Stores embeddings in local ChromaDB and conversation state in MongoDB
 
 ## 📦 Prerequisites
 
 - Python 3.8 or higher
 - pip (Python package manager)
 - Groq API Key (free at https://console.groq.com)
+- MongoDB instance or Atlas cluster
 - Internet connection for RSS feed fetching
 
 ## 🔧 Installation & Setup
@@ -122,6 +126,9 @@ Create a `.env` file in the project root:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB=your_database_name
+MONGO_COLLECTION=your_collection_name
 ```
 
 ## 🎯 How to Run
@@ -133,13 +140,13 @@ python app.py
 ```
 
 This starts:
-- **FastAPI Server**: Available at `http://localhost:8002`
+- **FastAPI Server**: Available at `http://localhost:8000`
 - **Gradio Web UI**: Available at `http://localhost:7860`
 
 ### Option 2: FastAPI Only
 
 ```bash
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8002 --reload
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Option 3: Gradio UI Only
@@ -163,39 +170,17 @@ python -c "from ui.gradio_ui import demo; demo.launch()"
 
 #### Ask a Question
 ```bash
-curl -X POST "http://localhost:8002/chat" \
+curl -X POST "http://localhost:8000/chat" \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the latest AI developments?"}'
+  -d '{"query": "What are the latest AI developments?", "session_id": "your-session-id"}'
 ```
 
-#### Load New Articles
+> The `session_id` parameter is used to persist conversation history in MongoDB across turns.
+
+#### Build the database with new articles
 ```bash
-curl -X POST "http://localhost:8002/load-articles" \
-  -H "Content-Type: application/json" \
-  -d '{"limit": 20}'
+curl -X POST "http://localhost:8000/build"
 ```
-
-#### Get Database Status
-```bash
-curl -X GET "http://localhost:8002/status"
-```
-
-## 🔄 Workflow Steps
-
-### Initial Setup
-1. **Data Collection**: `scraper/rss_scraper.py` fetches articles from RSS feed
-2. **Content Extraction**: `scraper/article_parser.py` extracts readable content from articles
-3. **Processing**: `rag/vector_store.py` chunks text and generates embeddings
-4. **Storage**: Embeddings are stored in ChromaDB
-
-### During Chatting
-1. **User Query**: User submits a question via UI or API
-2. **Embedding**: Query is converted to embedding
-3. **Retrieval**: `rag/retriever.py` finds relevant documents from vector store
-4. **Context Building**: Retrieved documents provide context
-5. **LLM Processing**: `rag/chatbot.py` sends prompt with context to Groq LLM
-6. **Response Generation**: LLM generates answer with source information
-7. **Memory Management**: Conversation history is maintained for context
 
 ## 📚 Key Components
 
@@ -204,8 +189,7 @@ curl -X GET "http://localhost:8002/status"
 | `vector_store.py` | Initialize ChromaDB, chunk texts, manage collections |
 | `embeddings.py` | Load sentence-transformer model for embeddings |
 | `retriever.py` | Search and retrieve relevant documents |
-| `chatbot.py` | Generate responses using LLM with retrieved context |
-| `rss_scraper.py` | Fetch and parse RSS feed articles |
+| `chatbot.py` | Generate responses using LLM with retrieved context || `mongo_memory.py` | Persist conversation history in MongoDB || `rss_scraper.py` | Fetch and parse RSS feed articles |
 | `article_parser.py` | Extract article content from HTML |
 | `gradio_ui.py` | Build conversational web interface |
 | `api/main.py` | Define REST API endpoints |
